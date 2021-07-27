@@ -1,3 +1,3 @@
 # GitHub-Actions-Workflow
 
-1. Refer Workflows -> Msbuild for .NET Framework CI/CD pipeline.
+1. Msbuild file for .NET Framework CI/CD pipeline.
