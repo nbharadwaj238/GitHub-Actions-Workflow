@@ -1,0 +1,83 @@
+name: MSBuild
+
+on: [push]
+
+env:
+  # Path to the solution file relative to the root of the project.
+  SOLUTION_FILE_PATH: Demo.sln
+  BUILD_CONFIGURATION: Release
+  PUBLISHED_FOLDER: Z:\Github\Demo\Bin\Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.2
+      #with:
+       # vswhere-path: 'C:\SELF-HOSTED-RUNNER\' 
+    
+    - name: Restore NuGet packages
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: nuget restore ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Build
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: msbuild website.publishproj /p:TransformWebconfigEnabled=False /p:Configuration=Debug /p:Platform='Any CPU' /p:DeployOnBuild=true /p:PublishProfile=App_Data/PublishProfiles/Sample.pubxml
+
+    - name: details
+      run : |
+           cd publish
+           dir
+           
+    - name: upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+          name: Artifact
+          path: publish
+          
+  Deploy:
+    name: Deploy to UAT
+    if: github.ref == 'refs/heads/master'
+    runs-on: SelfHostedRunner_UAT 
+    needs: build
+    steps:
+      
+    - name: Stop Site and App Pool
+      run: powershell.exe Import-Module WebAdministration; Stop-WebAppPool -Name "AppPool"; Stop-WebSite -Name "SiteName"
+      
+    - name: Download a Build Artifact
+      uses: actions/download-artifact@v2.0.5
+      with:
+        name: HHIArtifact
+        path: ${{github.workspace}}\SiteName
+    
+    - name: Start Site and App Pool
+      run: powershell.exe Import-Module WebAdministration; Start-WebAppPool -Name "AppPool"; Start-WebSite -Name "SiteName"
+      
+      
+  DeployProd:
+    name: Deploy to Prod
+    if: github.ref == 'refs/heads/master'
+    runs-on: azure-prod 
+    needs:  Deploy
+    environment: 
+      name: Prod.approvers
+    steps:
+       
+    - name: Stop Site and App Pool
+      run: powershell.exe Import-Module WebAdministration; Stop-WebAppPool -Name "AppPool"; Stop-WebSite -Name "SiteName"
+      
+    - name: Download a Build Artifact
+      uses: actions/download-artifact@v2.0.5
+      with:
+        name: HHIArtifact
+        path: ${{github.workspace}}
+    
+    - name: Start Site and App Pool
+      run: powershell.exe Import-Module WebAdministration; Start-WebAppPool -Name "AppPool"; Start-WebSite -Name "SiteName"
+ 
+    
